@@ -1,0 +1,6 @@
+
+data.json
+*.sqlite-shm
+data.sqlite
+data.sqlite-wal
+data.sqlite-shm
