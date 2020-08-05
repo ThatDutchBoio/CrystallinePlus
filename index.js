@@ -5,6 +5,9 @@ const prefix = ';';
 const fs = require('fs');
 const db = require('better-sqlite3')
 const sql = new db('./data.sqlite');
+const Canvas = require('canvas')
+
+
 const {
     ifError
 } = require('assert');
@@ -44,8 +47,22 @@ function getscore(userId, guildId) {
 //        .setAuthor(bot.user.tag,bot.user.avatarURL({dynamic: false, format: 'png', size: 512}))
 // templat: member.guild.id+"_"+member.id
 
+const applyText = (canvas, text) => {
+    const ctx = canvas.getContext('2d');
 
-bot.on('guildMemberAdd', member => {
+    // Declare a base size of the font
+    let fontSize = 70;
+
+    do {
+        // Assign the font to the context and decrement it so it can be measured again
+        ctx.font = `${fontSize -= 10}px sans-serif`;
+        // Compare pixel width of the text to the canvas minus the approximate avatar size
+    } while (ctx.measureText(text).width > canvas.width - 300);
+
+    // Return the result to use in the actual canvas
+    return ctx.font;
+};
+bot.on('guildMemberAdd', async member => {
     const welcome = new discord.MessageEmbed()
         .setTitle("Welcome to the server!")
         .setDescription("We hope you have a nice stay and hope to see ya chatting soon! \n if you need help with anything at all be sure to go to the request-support channel and type ;support! a staff members will be with you shortly")
@@ -59,27 +76,47 @@ bot.on('guildMemberAdd', member => {
     member.createDM({
         embed: welcome
     })
+    
     let role = member.guild.roles.cache.find(r => r.name === "Member");
     member.roles.add(role);
-    fs.readFile('./data.json', function (err, data) {
-        const jsonData = JSON.parse(data);
-        let dataNav = member.guild.id + "_" + member.id;
-        if (jsonData.data[dataNav] == undefined) {
-            jsonData.data[dataNav] = {
-                "warns": [],
-                "username": member.displayName,
-                "roles": member.roles.cache
-            }
-            let dataWrite = JSON.stringify(jsonData);
-            fs.writeFile('./data.json', dataWrite, function (err) {
-                console.log(err)
-            })
-        }
-    })
+    const channel = member.guild.channels.cache.find(ch => ch.name === 'member-logs');
+	if (!channel) return console.log('error');
+
+	const canvas = Canvas.createCanvas(700, 250);
+	const ctx = canvas.getContext('2d');
+
+
+	const background = await Canvas.loadImage('./wallpaper.png');
+	ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle ='#74037b';
+    ctx.strokeRect(0,0,canvas.width,canvas.height);
+
+    ctx.font = '28px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('Welcome to the server,',canvas.width/2.5,canvas.height/3.5)
+
+    ctx.font = applyText(canvas,member.displayName);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${member.displayName}!`,canvas.width /2.5,canvas.height/1.8);
+
+    ctx.beginPath();
+    ctx.arc(125,125,100,0,Math.PI * 2,true);
+    ctx.closePath();
+    ctx.clip();
+
+    const avatar = await Canvas.loadImage(member.user.displayAvatarURL({format: "jpg"}));
+
+    ctx.drawImage(avatar,25,25,200,200);
+
+    const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
+	channel.send(`Welcome to the server, ${member}!`, attachment);
+
+    
 
 })
 let oldRoles = new Map();
-bot.on('message', msg => {
+bot.on('message', async msg => {
     if (msg.author.id != bot.user.id) {
         let score = getscore(msg.author.id, msg.guild.id);
         if (!score) {
@@ -101,18 +138,35 @@ bot.on('message', msg => {
         const curLevel = Math.floor(0.5 * Math.sqrt(score.points));
         if (score.level < curLevel) {
             score.level++;
-            const leveledup = new discord.MessageEmbed()
-                .setTitle(msg.author.tag+" leveled up to level " + score.level + "!")
-                .setColor("GREEN")
-                .setAuthor(bot.user.tag, bot.user.avatarURL({
-                    dynamic: false,
-                    format: 'png',
-                    size: 512
-                }))
-                .setTimestamp()
-            msg.channel.send({
-                embed: leveledup
-            })
+            const canvas = Canvas.createCanvas(700, 250);
+	const ctx = canvas.getContext('2d');
+
+
+	const background = await Canvas.loadImage('./wallpaper.png');
+	ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle ='#74037b';
+    ctx.strokeRect(0,0,canvas.width,canvas.height);
+
+    ctx.font = '28px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${msg.author.tag} Leveled up to,`,canvas.width/2.5,canvas.height/3.5)
+
+    ctx.font = applyText(canvas,msg.author.displayName);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`level ${score.level}!`,canvas.width /2.5,canvas.height/1.8);
+
+    ctx.beginPath();
+    ctx.arc(125,125,100,0,Math.PI * 2,true);
+    ctx.closePath();
+    ctx.clip();
+
+    const avatar = await Canvas.loadImage(msg.author.displayAvatarURL({format: "jpg"}));
+
+    ctx.drawImage(avatar,25,25,200,200);
+
+    const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
+	msg.channel.send(`You leveled up!`, attachment);
         }
         bot.setScore.run(score);
 
@@ -1100,6 +1154,9 @@ bot.on('message', msg => {
                     })
 
                 }
+            break;
+            case 'join':
+                bot.emit('guildMemberAdd',msg.member);
             break;
         }
 
