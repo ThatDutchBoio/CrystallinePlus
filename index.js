@@ -13,6 +13,7 @@ const {
 } = require('assert');
 bot.on('ready', () => {
     console.log("Bot online");
+    bot.user.setActivity("just chillin")
     const table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'scores';").get();
     if (!table['count(*)']) {
         sql.prepare("CREATE TABLE scores (id TEXT PRIMARY KEY, user TEXT, guild TEXT,points INTEGER,level INTEGER,warns TEXT);").run();
