@@ -6,12 +6,14 @@ const fs = require('fs');
 const db = require('better-sqlite3')
 const sql = new db('./data.sqlite');
 const Canvas = require('canvas')
+var dutchsmodule = require('dutchsmodule')
 
 
 const {
     ifError
 } = require('assert');
 bot.on('ready', () => {
+    
     console.log("Bot online");
     bot.user.setActivity("just chillin")
     const table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'scores';").get();
@@ -225,7 +227,17 @@ bot.on('message', async msg => {
         })
         switch (args[0]) {
             //  commands    
-
+            case 'test':
+                if(msg.member.hasPermission('ADMINISTRATOR')){
+                const fields = {
+                    "I'm":"gay",
+                    "You're": "Straight"
+                }          
+               msg.channel.send({
+                   embed: dutchsmodule.makeEmbed("aooga","booga",fields,"green",true,bot.user)
+               }) 
+            } 
+            break;
             case 'support':
                 if (msg.author.id != bot.user.id && msg.channel.name === "request-support") {
 
