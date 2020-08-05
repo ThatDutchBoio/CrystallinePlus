@@ -1,7 +1,7 @@
 const discord = require('discord.js');
 const config = require('./config.json')
 const bot = new discord.Client()
-const prefix = ';';
+const prefix = config.prefix;
 const fs = require('fs');
 const db = require('better-sqlite3')
 const sql = new db('./data.sqlite');
@@ -79,6 +79,7 @@ bot.on('guildMemberAdd', async member => {
     
     let role = member.guild.roles.cache.find(r => r.name === "Member");
     member.roles.add(role);
+    let citrine = member.guild.roles.cache.find(r => r.name === "Lvl 1 | Citrine")
     const channel = member.guild.channels.cache.find(ch => ch.name === 'member-logs');
 	if (!channel) return console.log('error');
 
@@ -133,11 +134,45 @@ bot.on('message', async msg => {
         }
         console.log(score)
         score.points = score.points + 1;
-
+        if(score.level >= 1){
+            let citrine = msg.guild.roles.cache.find(r => r.name == "Lvl 1 | Citrine");
+            msg.member.roles.add(citrine);
+        }else if(score.level >= 5){
+            let sodalite = msg.guild.roles.cache.find(r => r.name == "Lvl 5 | Sodalite");
+            msg.member.roles.add(sodalite);
+        }else if(score.level >= 10){
+            let rosequartz = msg.guild.roles.cache.find(r => r.name == 'Lvl 10 | Rose quartz');
+            msg.member.roles.add(rosequartz);
+        }else if(score.level >= 20){
+            let sapphire = msg.guild.roles.cache.find(r => r.name == 'Lvl 20 | Sapphire');
+            msg.member.roles.add(sapphire);
+        }else if(score.level >= 30){
+            let emerald = msg.guild.roles.cache.find(r => r.name == 'Lvl 30 | Emerald');
+            msg.member.roles.add(emerald);
+        }else if(score.level >= 50){
+            let Diamond = msg.guild.roles.cache.find(r => r.name == 'Lvl 50 | Diamond');
+            msg.member.roles.add(Diamond);
+        }
 
         const curLevel = Math.floor(0.5 * Math.sqrt(score.points));
         if (score.level < curLevel) {
             score.level++;
+            if(score.level >= 5){
+                let sodalite = msg.guild.roles.cache.find(r => r.name == "Lvl 5 | Sodalite");
+                msg.member.roles.add(sodalite);
+            }else if(score.level >= 10){
+                let rosequartz = msg.guild.roles.cache.find(r => r.name == 'Lvl 10 | Rose quartz');
+                msg.member.roles.add(rosequartz);
+            }else if(score.level >= 20){
+                let sapphire = msg.guild.roles.cache.find(r => r.name == 'Lvl 20 | Sapphire');
+                msg.member.roles.add(sapphire);
+            }else if(score.level >= 30){
+                let emerald = msg.guild.roles.cache.find(r => r.name == 'Lvl 30 | Emerald');
+                msg.member.roles.add(emerald);
+            }else if(score.level >= 50){
+                let Diamond = msg.guild.roles.cache.find(r => r.name == 'Lvl 50 | Diamond');
+                msg.member.roles.add(Diamond);
+            }
             const canvas = Canvas.createCanvas(700, 250);
 	const ctx = canvas.getContext('2d');
 
@@ -1125,38 +1160,79 @@ bot.on('message', async msg => {
             case 'level':
                 if(msg.mentions.members.first() != undefined){
                     let score = getscore(msg.mentions.members.first().id,msg.guild.id);
-                    const levelEmb = new discord.MessageEmbed()
-                        .setTitle(msg.mentions.members.first().displayName+" is level"+score.level)
-                        .setColor("RED")
-                        .setTimestamp()
-                        .setAuthor(bot.user.tag, bot.user.avatarURL({
-                            dynamic: false,
-                            format: 'png',
-                            size: 512
-                        }))
-                    msg.channel.send({
-                        embed: levelEmb
-                    })
+                    const canvas = Canvas.createCanvas(700, 250);
+                    const ctx = canvas.getContext('2d');
+                
+                
+                    const background = await Canvas.loadImage('./wallpaper.png');
+                    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+                
+                    ctx.strokeStyle ='#74037b';
+                    ctx.strokeRect(0,0,canvas.width,canvas.height);
+                
+                    ctx.font = '28px sans-serif';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(`${msg.mentions.members.first().user.tag}'s level:`,canvas.width/2.5,canvas.height/3.5)
+                
+                    ctx.font = applyText(canvas,msg.author.displayName);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(`level ${score.level}`,canvas.width /2.5,canvas.height/1.8);
+                
+                    ctx.beginPath();
+                    ctx.arc(125,125,100,0,Math.PI * 2,true);
+                    ctx.closePath();
+                    ctx.clip();
+                
+                    const avatar = await Canvas.loadImage(msg.mentions.members.first().user.displayAvatarURL({format: "jpg"}));
+                
+                    ctx.drawImage(avatar,25,25,200,200);
+                
+                    const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
+                    msg.channel.send(`<@${msg.mentions.members.first().id}> is level`,attachment);
 
                 }else{
                     let score = getscore(msg.author.id,msg.guild.id);
-                    const levelEmb = new discord.MessageEmbed()
-                        .setTitle(`${msg.author.username} is level ${score.level}`)
-                        .setColor("RED")
-                        .setTimestamp()
-                        .setAuthor(bot.user.tag, bot.user.avatarURL({
-                            dynamic: false,
-                            format: 'png',
-                            size: 512
-                        }))
-                    msg.channel.send({
-                        embed: levelEmb
-                    })
+                    const canvas = Canvas.createCanvas(700, 250);
+                    const ctx = canvas.getContext('2d');
+                
+                
+                    const background = await Canvas.loadImage('./wallpaper.png');
+                    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+                
+                    ctx.strokeStyle ='#74037b';
+                    ctx.strokeRect(0,0,canvas.width,canvas.height);
+                
+                    ctx.font = '28px sans-serif';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(`${msg.author.tag}'s level:`,canvas.width/2.5,canvas.height/3.5)
+                
+                    ctx.font = applyText(canvas,msg.author.displayName);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(`level ${score.level}`,canvas.width /2.5,canvas.height/1.8);
+                
+                    ctx.beginPath();
+                    ctx.arc(125,125,100,0,Math.PI * 2,true);
+                    ctx.closePath();
+                    ctx.clip();
+                
+                    const avatar = await Canvas.loadImage(msg.author.displayAvatarURL({format: "jpg"}));
+                
+                    ctx.drawImage(avatar,25,25,200,200);
+                
+                    const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
+                    msg.channel.send(`<@${msg.author.id}> is level`,attachment);
+                        
+                    
 
                 }
             break;
             case 'join':
                 bot.emit('guildMemberAdd',msg.member);
+            break;
+            case 'sendembed':
+                if(msg.member.hasPermission("ADMINISTRATOR")){
+                    msg.channel.send("What ")
+                }
             break;
         }
 
