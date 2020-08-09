@@ -1,4 +1,4 @@
-const discord = require('discord.js');
+const discord = require('discord.js')
 const config = require('./config.json')
 const bot = new discord.Client()
 const prefix = config.prefix;
@@ -6,14 +6,22 @@ const fs = require('fs');
 const db = require('better-sqlite3')
 const sql = new db('./data.sqlite');
 const Canvas = require('canvas')
-var dutchsmodule = require('dutchsmodule')
+const ffmpeg = require('ffmpeg')
+const ytdl = require('ytdl-core')
+const Youtube = require('simple-youtube-api')
+const { youtubeApi } = require('./config.json')
+const youtube = new Youtube(youtubeApi)
+
+
+
+
 
 
 const {
     ifError
 } = require('assert');
 bot.on('ready', () => {
-    
+
     console.log("Bot online");
     bot.user.setActivity("just chillin")
     const table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'scores';").get();
@@ -26,7 +34,29 @@ bot.on('ready', () => {
     }
     bot.getScore = sql.prepare("SELECT * FROM scores WHERE user = ? AND guild = ?");
     bot.setScore = sql.prepare("INSERT OR REPLACE INTO scores (id, user, guild, points, level, warns) VALUES (@id, @user, @guild, @points, @level, @warns);");
+
+    const aooga = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'backgrounds';").get();
+    if(!aooga['count(*)']){
+        sql.prepare("CREATE TABLE backgrounds (userId TEXT PRIMARY KEY, bgpath TEXT);").run();
+        sql.prepare("CREATE UNIQUE INDEX idx_backgrounds_id ON backgrounds (userId);").run();
+        sql.pragma("synchronous = 1");
+        sql.pragma("journal_mode = wal");
+    }
+    bot.getBackground = sql.prepare("SELECT * FROM backgrounds WHERE userId = ?");
+    bot.setBackground = sql.prepare("INSERT OR REPLACE INTO backgrounds (userId, bgpath) VALUES (@userId,@bgpath);");
 })
+
+function getBackground(x) {
+    let bg = bot.getBackground.get(x);
+    if (!bg) {
+        bg = {
+            userId : x,
+            bgpath : './wallpaper.png' 
+        }
+        bot.setBackground.run(bg);
+    }
+    return bot.getBackground.get(x);
+}
 
 function getscore(userId, guildId) {
     let score = bot.getScore.get(userId, guildId);
@@ -35,7 +65,7 @@ function getscore(userId, guildId) {
         score = {
             id: `${guildId}-${userId}`,
             user: userId,
-            guild:guildId,
+            guild: guildId,
             points: 0,
             level: 1,
             warns: warnsString
@@ -65,6 +95,16 @@ const applyText = (canvas, text) => {
     // Return the result to use in the actual canvas
     return ctx.font;
 };
+
+async function play(bot,msg,args,connection){
+    let validate  = await ytdl.validateURL(args[1])
+    if(!validate) return
+    if(validate) queue.push(args[1])
+    let info = await ytdl.getInfo(args[1])
+    let dispatcher = await connection.playStream(ytdl(args[1], {filter: 'audioonly'}));
+    
+}
+
 bot.on('guildMemberAdd', async member => {
     const welcome = new discord.MessageEmbed()
         .setTitle("Welcome to the server!")
@@ -79,48 +119,52 @@ bot.on('guildMemberAdd', async member => {
     member.createDM({
         embed: welcome
     })
-    
+
     let role = member.guild.roles.cache.find(r => r.name === "Member");
     member.roles.add(role);
     let citrine = member.guild.roles.cache.find(r => r.name === "Lvl 1 | Citrine")
     const channel = member.guild.channels.cache.find(ch => ch.name === 'member-logs');
-	if (!channel) return console.log('error');
+    if (!channel) return console.log('error');
 
-	const canvas = Canvas.createCanvas(700, 250);
-	const ctx = canvas.getContext('2d');
+    const canvas = Canvas.createCanvas(700, 250);
+    const ctx = canvas.getContext('2d');
 
 
-	const background = await Canvas.loadImage('./wallpaper.png');
-	ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+    const background = await Canvas.loadImage('./wallpaper.png');
+    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle ='#74037b';
-    ctx.strokeRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = '#74037b';
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
     ctx.font = '28px sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('Welcome to the server,',canvas.width/2.5,canvas.height/3.5)
+    ctx.fillText('Welcome to the server,', canvas.width / 2.5, canvas.height / 3.5)
 
-    ctx.font = applyText(canvas,member.displayName);
+    ctx.font = applyText(canvas, member.displayName);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${member.displayName}!`,canvas.width /2.5,canvas.height/1.8);
+    ctx.fillText(`${member.displayName}!`, canvas.width / 2.5, canvas.height / 1.8);
 
     ctx.beginPath();
-    ctx.arc(125,125,100,0,Math.PI * 2,true);
+    ctx.arc(125, 125, 100, 0, Math.PI * 2, true);
     ctx.closePath();
     ctx.clip();
 
-    const avatar = await Canvas.loadImage(member.user.displayAvatarURL({format: "jpg"}));
+    const avatar = await Canvas.loadImage(member.user.displayAvatarURL({
+        format: "jpg"
+    }));
 
-    ctx.drawImage(avatar,25,25,200,200);
+    ctx.drawImage(avatar, 25, 25, 200, 200);
 
     const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
-	channel.send(`Welcome to the server, ${member}!`, attachment);
+    channel.send(`Welcome to the server, ${member}!`, attachment);
 
-    
+
 
 })
+const queue = []
 let oldRoles = new Map();
 bot.on('message', async msg => {
+    
     if (msg.author.id != bot.user.id) {
         let score = getscore(msg.author.id, msg.guild.id);
         if (!score) {
@@ -137,22 +181,22 @@ bot.on('message', async msg => {
         }
         console.log(score)
         score.points = score.points + 1;
-        if(score.level >= 1){
+        if (score.level >= 1) {
             let citrine = msg.guild.roles.cache.find(r => r.name == "Lvl 1 | Citrine");
             msg.member.roles.add(citrine);
-        }else if(score.level >= 5){
+        } else if (score.level >= 5) {
             let sodalite = msg.guild.roles.cache.find(r => r.name == "Lvl 5 | Sodalite");
             msg.member.roles.add(sodalite);
-        }else if(score.level >= 10){
+        } else if (score.level >= 10) {
             let rosequartz = msg.guild.roles.cache.find(r => r.name == 'Lvl 10 | Rose quartz');
             msg.member.roles.add(rosequartz);
-        }else if(score.level >= 20){
+        } else if (score.level >= 20) {
             let sapphire = msg.guild.roles.cache.find(r => r.name == 'Lvl 20 | Sapphire');
             msg.member.roles.add(sapphire);
-        }else if(score.level >= 30){
+        } else if (score.level >= 30) {
             let emerald = msg.guild.roles.cache.find(r => r.name == 'Lvl 30 | Emerald');
             msg.member.roles.add(emerald);
-        }else if(score.level >= 50){
+        } else if (score.level >= 50) {
             let Diamond = msg.guild.roles.cache.find(r => r.name == 'Lvl 50 | Diamond');
             msg.member.roles.add(Diamond);
         }
@@ -160,51 +204,53 @@ bot.on('message', async msg => {
         const curLevel = Math.floor(0.5 * Math.sqrt(score.points));
         if (score.level < curLevel) {
             score.level++;
-            if(score.level >= 5){
+            if (score.level >= 5) {
                 let sodalite = msg.guild.roles.cache.find(r => r.name == "Lvl 5 | Sodalite");
                 msg.member.roles.add(sodalite);
-            }else if(score.level >= 10){
+            } else if (score.level >= 10) {
                 let rosequartz = msg.guild.roles.cache.find(r => r.name == 'Lvl 10 | Rose quartz');
                 msg.member.roles.add(rosequartz);
-            }else if(score.level >= 20){
+            } else if (score.level >= 20) {
                 let sapphire = msg.guild.roles.cache.find(r => r.name == 'Lvl 20 | Sapphire');
                 msg.member.roles.add(sapphire);
-            }else if(score.level >= 30){
+            } else if (score.level >= 30) {
                 let emerald = msg.guild.roles.cache.find(r => r.name == 'Lvl 30 | Emerald');
                 msg.member.roles.add(emerald);
-            }else if(score.level >= 50){
+            } else if (score.level >= 50) {
                 let Diamond = msg.guild.roles.cache.find(r => r.name == 'Lvl 50 | Diamond');
                 msg.member.roles.add(Diamond);
             }
             const canvas = Canvas.createCanvas(700, 250);
-	const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d');
 
+            const bg = getBackground(msg.author.id)
+            const background = await Canvas.loadImage(bg.bgpath);
+            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
-	const background = await Canvas.loadImage('./wallpaper.png');
-	ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#74037b';
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle ='#74037b';
-    ctx.strokeRect(0,0,canvas.width,canvas.height);
+            ctx.font = '28px sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`${msg.author.tag} Leveled up to,`, canvas.width / 2.5, canvas.height / 3.5)
 
-    ctx.font = '28px sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${msg.author.tag} Leveled up to,`,canvas.width/2.5,canvas.height/3.5)
+            ctx.font = applyText(canvas, msg.author.displayName);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`level ${score.level}!`, canvas.width / 2.5, canvas.height / 1.8);
 
-    ctx.font = applyText(canvas,msg.author.displayName);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`level ${score.level}!`,canvas.width /2.5,canvas.height/1.8);
+            ctx.beginPath();
+            ctx.arc(125, 125, 100, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.clip();
 
-    ctx.beginPath();
-    ctx.arc(125,125,100,0,Math.PI * 2,true);
-    ctx.closePath();
-    ctx.clip();
+            const avatar = await Canvas.loadImage(msg.author.displayAvatarURL({
+                format: "jpg"
+            }));
 
-    const avatar = await Canvas.loadImage(msg.author.displayAvatarURL({format: "jpg"}));
+            ctx.drawImage(avatar, 25, 25, 200, 200);
 
-    ctx.drawImage(avatar,25,25,200,200);
-
-    const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
-	msg.channel.send(`You leveled up!`, attachment);
+            const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
+            msg.channel.send(`You leveled up!`, attachment);
         }
         bot.setScore.run(score);
 
@@ -227,17 +273,18 @@ bot.on('message', async msg => {
         })
         switch (args[0]) {
             //  commands    
+
             case 'test':
-                if(msg.member.hasPermission('ADMINISTRATOR')){
-                const fields = {
-                    "I'm":"gay",
-                    "You're": "Straight"
-                }          
-               msg.channel.send({
-                   embed: dutchsmodule.makeEmbed("aooga","booga",fields,"green",true,bot.user)
-               }) 
-            } 
-            break;
+                if (msg.member.hasPermission('ADMINISTRATOR')) {
+                    const fields = {
+                        "I'm": "gay",
+                        "You're": "Straight"
+                    }
+                    msg.channel.send({
+                        embed: dutchsmodule.makeEmbed("aooga", "booga", fields, "green", true, bot.user)
+                    })
+                }
+                break;
             case 'support':
                 if (msg.author.id != bot.user.id && msg.channel.name === "request-support") {
 
@@ -1171,83 +1218,151 @@ bot.on('message', async msg => {
                 }
                 break;
             case 'level':
-                if(msg.mentions.members.first() != undefined){
-                    let score = getscore(msg.mentions.members.first().id,msg.guild.id);
+                if (msg.mentions.members.first() != undefined) {
+                    let bg = getBackground(msg.mentions.members.first().id)
+                    let score = getscore(msg.mentions.members.first().id, msg.guild.id);
                     const canvas = Canvas.createCanvas(700, 250);
                     const ctx = canvas.getContext('2d');
-                
-                
-                    const background = await Canvas.loadImage('./wallpaper.png');
-                    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
-                
-                    ctx.strokeStyle ='#74037b';
-                    ctx.strokeRect(0,0,canvas.width,canvas.height);
-                
-                    ctx.font = '28px sans-serif';
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillText(`${msg.mentions.members.first().user.tag}'s level:`,canvas.width/2.5,canvas.height/3.5)
-                
-                    ctx.font = applyText(canvas,msg.author.displayName);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillText(`level ${score.level}`,canvas.width /2.5,canvas.height/1.8);
-                
-                    ctx.beginPath();
-                    ctx.arc(125,125,100,0,Math.PI * 2,true);
-                    ctx.closePath();
-                    ctx.clip();
-                
-                    const avatar = await Canvas.loadImage(msg.mentions.members.first().user.displayAvatarURL({format: "jpg"}));
-                
-                    ctx.drawImage(avatar,25,25,200,200);
-                
-                    const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
-                    msg.channel.send(`<@${msg.mentions.members.first().id}> is level`,attachment);
+                      
 
-                }else{
-                    let score = getscore(msg.author.id,msg.guild.id);
-                    const canvas = Canvas.createCanvas(700, 250);
-                    const ctx = canvas.getContext('2d');
-                
-                
-                    const background = await Canvas.loadImage('./wallpaper.png');
+                    const background = await Canvas.loadImage(bg.bgpath);
                     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
-                
-                    ctx.strokeStyle ='#74037b';
-                    ctx.strokeRect(0,0,canvas.width,canvas.height);
-                
+
+                    ctx.strokeStyle = '#74037b';
+                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
                     ctx.font = '28px sans-serif';
                     ctx.fillStyle = '#ffffff';
-                    ctx.fillText(`${msg.author.tag}'s level:`,canvas.width/2.5,canvas.height/3.5)
-                
-                    ctx.font = applyText(canvas,msg.author.displayName);
+                    ctx.fillText(`${msg.mentions.members.first().user.tag}'s level:`, canvas.width / 2.5, canvas.height / 3.5)
+
+                    ctx.font = applyText(canvas, msg.author.displayName);
                     ctx.fillStyle = '#ffffff';
-                    ctx.fillText(`level ${score.level}`,canvas.width /2.5,canvas.height/1.8);
-                
+                    ctx.fillText(`level ${score.level}`, canvas.width / 2.5, canvas.height / 1.8);
+
                     ctx.beginPath();
-                    ctx.arc(125,125,100,0,Math.PI * 2,true);
+                    ctx.arc(125, 125, 100, 0, Math.PI * 2, true);
                     ctx.closePath();
                     ctx.clip();
-                
-                    const avatar = await Canvas.loadImage(msg.author.displayAvatarURL({format: "jpg"}));
-                
-                    ctx.drawImage(avatar,25,25,200,200);
-                
+
+                    const avatar = await Canvas.loadImage(msg.mentions.members.first().user.displayAvatarURL({
+                        format: "jpg"
+                    }));
+
+                    ctx.drawImage(avatar, 25, 25, 200, 200);
+
                     const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
-                    msg.channel.send(`<@${msg.author.id}> is level`,attachment);
-                        
+                    msg.channel.send(`<@${msg.mentions.members.first().id}> is level`, attachment);
+
+                } else {
+                    let bg = getBackground(msg.author.id)
+                    let score = getscore(msg.author.id, msg.guild.id);
+                    const canvas = Canvas.createCanvas(700, 250);
+                    const ctx = canvas.getContext('2d');
+
                     
+                    const background = await Canvas.loadImage(bg.bgpath);
+                    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+                    ctx.strokeStyle = '#74037b';
+                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+                    ctx.font = '28px sans-serif';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(`${msg.author.tag}'s level:`, canvas.width / 2.5, canvas.height / 3.5)
+
+                    ctx.font = applyText(canvas, msg.author.displayName);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(`level ${score.level}`, canvas.width / 2.5, canvas.height / 1.8);
+
+                    ctx.beginPath();
+                    ctx.arc(125, 125, 100, 0, Math.PI * 2, true);
+                    ctx.closePath();
+                    ctx.clip();
+
+                    const avatar = await Canvas.loadImage(msg.author.displayAvatarURL({
+                        format: "jpg"
+                    }));
+
+                    ctx.drawImage(avatar, 25, 25, 200, 200);
+
+                    const attachment = new discord.MessageAttachment(canvas.toBuffer(), 'welcome-image.png');
+                    msg.channel.send(`<@${msg.author.id}> is level`, attachment);
+
+
 
                 }
-            break;
+                break;
             case 'join':
-                bot.emit('guildMemberAdd',msg.member);
-            break;
+                bot.emit('guildMemberAdd', msg.member);
+                break;
             case 'sendembed':
-                if(msg.member.hasPermission("ADMINISTRATOR")){
+                if (msg.member.hasPermission("ADMINISTRATOR")) {
                     msg.channel.send("What ")
                 }
+                break;
+            
+            case 'leave':
+                if(msg.member.hasPermission('ADMINISTRATOR')){
+                    msg.member.voice.channel.leave();
+                }
             break;
-        }
+            case 'play':
+                if(msg.member.hasPermission('ADMINISTRATOR')){
+
+                    if(!msg.member.voice.channel){
+
+                    }else{
+                        
+                        const vc = msg.member.voice.channel
+                        vc.join().then(connection =>{
+                            console.log('connected to vc')
+                            play(bot,msg,args,connection)
+                            
+
+                        }).catch(e =>{
+                            console.log(e)
+                        })
+                    
+                    }
+                }
+            break;
+            case 'setbackground':
+                    let bg = bot.getBackground.get(msg.author.id);
+                    if(msg.content.includes('default')){
+                        bg.bgpath = './wallpaper.png'
+                    bot.setBackground.run(bg);
+                    const success = new discord.MessageEmbed()
+                        .setTitle(`Changed background back to default`)
+                        .setTimestamp()
+                        .setAuthor(bot.user.tag, bot.user.avatarURL({
+                            dynamic: false,
+                            format: 'png',
+                            size: 512
+                        }))
+                        .setColor('GREEN')
+                return msg.channel.send({
+                    embed: success
+                })
+                    }
+                    if(!msg.attachments.first()){ return msg.reply("Attach the image you want to change to in the message!")}
+                    
+                    bg.bgpath = msg.attachments.first().url
+                    bot.setBackground.run(bg);
+                    const success = new discord.MessageEmbed()
+                        .setTitle(`Changed background to: ${msg.attachments.first().url}`)
+                        .setTimestamp()
+                        .setAuthor(bot.user.tag, bot.user.avatarURL({
+                            dynamic: false,
+                            format: 'png',
+                            size: 512
+                        }))
+                        .setColor('GREEN')
+                msg.channel.send({
+                    embed: success
+                })
+            break;
+            }
+            
 
 
     }
